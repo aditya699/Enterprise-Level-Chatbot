@@ -1,0 +1,6 @@
+langchain-anthropic
+pyodbc
+python-dotenv
+fastapi 
+uvicorn
+pytest
