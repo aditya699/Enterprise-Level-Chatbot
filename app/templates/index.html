@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Interface</title>
+    <link rel="stylesheet" href="/static/css/style.css">  <!-- Changed from styles.css to style.css -->
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <img src="/static/images/logo.PNG" alt="Logo" class="logo">
+            <h1>Chat Interface</h1>
+        </div>
+    </header>
+
+    <div class="chat-container">
+        <div class="messages" id="messages">
+            <!-- Messages will be added here -->
+        </div>
+        <div class="input-area">
+            <input type="text" id="userInput" placeholder="Type your message...">
+            <button type="button" onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <script src="/static/js/chat.js" defer></script>  <!-- Changed from script.js to chat.js and added defer -->
+</body>
+</html>

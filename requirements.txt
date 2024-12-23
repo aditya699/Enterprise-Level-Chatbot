@@ -4,3 +4,9 @@ python-dotenv
 fastapi 
 uvicorn
 pytest
+jinja2
+python-multipart
+google-auth-oauthlib   
+python-jose[cryptography]
+python-multipart 
+itsdangerous
