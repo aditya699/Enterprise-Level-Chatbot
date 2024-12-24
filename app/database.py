@@ -13,10 +13,10 @@ CONNECTION_POOL: List[pyodbc.Connection] = []  # Store our connections
 def create_connection():
     """Creates a single database connection"""
     return pyodbc.connect(
-        f'DRIVER={{ODBC Driver 17 for SQL Server}};'
-        f'SERVER={os.getenv("DB_SERVER")};'
-        f'DATABASE={os.getenv("DB_NAME")};'
-        f'Trusted_Connection={os.getenv("DB_TRUSTED")};'
+        'DRIVER={ODBC Driver 17 for SQL Server};'
+        'SERVER=DESKTOP-KLL45AE\\SQLEXPRESS;'
+        'DATABASE=master;'
+        'Trusted_Connection=yes;'
     )
 
 def initialize_pool():
