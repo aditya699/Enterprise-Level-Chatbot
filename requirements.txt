@@ -10,3 +10,4 @@ google-auth-oauthlib
 python-jose[cryptography]
 python-multipart 
 itsdangerous
+fastapi-sessions
