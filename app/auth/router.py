@@ -14,63 +14,74 @@ async def login():
 
 @router.get("/callback")
 async def callback(code: str):
-    user_info = utils.get_google_user_info(code)
-    
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-        
-        # Check if user exists
-        cursor.execute("""
-            SELECT id FROM Users 
-            WHERE email = ?
-        """, (user_info['email'],))
-        
-        user_row = cursor.fetchone()
-        
-        if user_row:
-            # Existing user - update last login
-            cursor.execute("""
-                UPDATE Users 
-                SET last_login = GETDATE()
-                WHERE email = ?
-            """, (user_info['email'],))
-            user_id = user_row[0]
-        else:
-            # New user - insert
-            cursor.execute("""
-                INSERT INTO Users (email, name, picture_url, google_id)
-                OUTPUT INSERTED.id
-                VALUES (?, ?, ?, ?)
-            """, (
-                user_info['email'],
-                user_info['name'],
-                user_info['picture'],
-                user_info['id']
-            ))
-            user_id = cursor.fetchone()[0]
+    try:
+        # Get user info from Google
+        try:
+            user_info = utils.get_google_user_info(code)
+        except Exception as e:
+            print("Debug - Google auth error:", str(e))
+            return RedirectResponse(url="/login?error=Failed to get user info")
 
-        # Create session token
-        session_token = create_session_token(user_info['email'])
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                
+                # Check if user exists
+                cursor.execute("""
+                    SELECT id FROM Users 
+                    WHERE email = ?
+                """, (user_info['email'],))
+                
+                user_row = cursor.fetchone()
+                user_id = user_row[0] if user_row else None
+                
+                if not user_id:
+                    # New user - insert
+                    cursor.execute("""
+                        INSERT INTO Users (email, name, picture_url, google_id)
+                        OUTPUT INSERTED.id
+                        VALUES (?, ?, ?, ?)
+                    """, (
+                        user_info['email'],
+                        user_info['name'],
+                        user_info['picture'],
+                        user_info['id']
+                    ))
+                    user_id = cursor.fetchone()[0]
 
-        # Store in database
-        cursor.execute("""
-            INSERT INTO Sessions (user_id, session_token, expires_at)
-            VALUES (?, ?, DATEADD(day, 1, GETDATE()))
-        """, (user_id, session_token))
-        
-        conn.commit()
+                session_token = create_session_token(user_info['email'])
+                print("Debug - Created new session token:", session_token)
 
-        # Create response with redirect
-        response = RedirectResponse(url="/chat")
-        
-        # Set the session token as cookie
-        response.set_cookie(
-            key="session_token",
-            value=session_token,
-            httponly=True,   # Prevents JavaScript access
-            secure=True,     # Only sent over HTTPS
-            samesite="lax",  # CSRF protection
-            max_age=60 * 60 * 24  # 24 hours
-        )
-        
-        return response
+                # Store in database
+                cursor.execute("""
+                    INSERT INTO Sessions (user_id, session_token, expires_at)
+                    VALUES (?, ?, DATEADD(day, 1, GETDATE()))
+                """, (user_id, session_token))
+                
+                conn.commit()
+                print("Debug - Stored session in database")
+
+                response = RedirectResponse(url="/chat")
+                
+                # Set cookie with minimal secure settings for localhost
+                response.set_cookie(
+                    key="session_token",
+                    value=session_token,
+                    secure=False,  # Allow HTTP for localhost
+                    httponly=True,
+                    samesite="Lax",
+                    max_age=86400,  # 24 hours in seconds
+                    path="/",
+                    domain=None  # Let browser determine domain
+                )
+                print("Debug - Set cookie in response")
+                
+                return response
+
+        except Exception as db_error:
+            print("Debug - Database error:", str(db_error))
+            return RedirectResponse(url="/login?error=Database error")
+
+    except Exception as e:
+        print("Debug - Unexpected error:", str(e))
+        return RedirectResponse(url="/login?error=Unknown error")

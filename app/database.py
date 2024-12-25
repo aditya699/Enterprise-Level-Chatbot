@@ -3,7 +3,7 @@ from typing import List
 import os
 from dotenv import load_dotenv
 from contextlib import contextmanager
-
+import time
 load_dotenv()
 
 # Pool configuration
@@ -21,46 +21,91 @@ def create_connection():
 
 def initialize_pool():
     """Creates the initial pool of connections"""
-    for _ in range(POOL_SIZE):
+    global CONNECTION_POOL
+    CONNECTION_POOL = []  # Reset the pool
+    
+    retries = 3
+    retry_delay = 2  # seconds
+    
+    for attempt in range(retries):
         try:
-            conn = create_connection()
-            CONNECTION_POOL.append(conn)
+            for _ in range(POOL_SIZE):
+                conn = create_connection()
+                CONNECTION_POOL.append(conn)
+            print(f"Pool initialized with {len(CONNECTION_POOL)} connections")
+            return True
         except Exception as e:
-            print(f"Error creating connection: {e}")
-    print(f"Pool initialized with {len(CONNECTION_POOL)} connections")
+            print(f"Attempt {attempt + 1}/{retries} failed: {e}")
+            if attempt < retries - 1:
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+    
+    print("Failed to initialize connection pool after all attempts")
+    return False
 
 @contextmanager
 def get_db_connection():
     """
     Gets a connection from the pool and returns it when done
-    Usage: 
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM Users")
     """
     connection = None
+    max_retries = 3
+    retry_count = 0
     
-    # Try to get a connection from the pool
-    if CONNECTION_POOL:
-        connection = CONNECTION_POOL.pop()
-    else:
-        # If pool is empty, create new connection
-        connection = create_connection()
+    while retry_count < max_retries:
+        try:
+            # Try to get a connection from the pool
+            if CONNECTION_POOL:
+                connection = CONNECTION_POOL.pop()
+                
+                # Test if connection is still alive
+                cursor = connection.cursor()
+                cursor.execute("SELECT 1")
+                cursor.fetchone()
+                
+                break  # Connection is good
+            else:
+                # If pool is empty, try to create new connection
+                connection = create_connection()
+                break
+                
+        except Exception as e:
+            print(f"Connection attempt {retry_count + 1} failed: {e}")
+            retry_count += 1
+            
+            if connection:
+                try:
+                    connection.close()
+                except:
+                    pass
+                    
+            if retry_count < max_retries:
+                time.sleep(1)  # Wait before retrying
+            
+    if not connection:
+        raise Exception("Could not establish database connection after multiple attempts")
     
     try:
-        # Give the connection to the user
         yield connection
     finally:
         try:
-            # Return connection to pool if it's good
-            if connection and not connection.closed:
-                CONNECTION_POOL.append(connection)
-            else:
-                # If connection is bad, create new one for pool
+            # Test connection before returning to pool
+            cursor = connection.cursor()
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+            CONNECTION_POOL.append(connection)
+        except:
+            # If connection is bad, create new one for pool
+            try:
+                connection.close()
+            except:
+                pass
+            try:
                 new_conn = create_connection()
                 CONNECTION_POOL.append(new_conn)
-        except Exception as e:
-            print(f"Error returning connection to pool: {e}")
+            except Exception as e:
+                print(f"Error creating replacement connection: {e}")
+
 
 # Function to test if connection is working
 def test_connection():
