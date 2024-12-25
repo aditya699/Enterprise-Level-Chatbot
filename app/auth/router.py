@@ -3,7 +3,7 @@ from fastapi.responses import RedirectResponse
 from . import utils
 from .sessions import create_session_token  # Add this import
 from ..database import get_db_connection  # Add this import
-
+from datetime import datetime, timedelta, timezone
 router = APIRouter()
 
 @router.get("/login")
@@ -71,7 +71,8 @@ async def callback(code: str):
                     httponly=True,
                     samesite="Lax",
                     max_age=86400,  # 24 hours in seconds
-                    path="/",
+                    path="/",    
+                    expires=datetime.now(timezone.utc) + timedelta(days=1),
                     domain=None  # Let browser determine domain
                 )
                 print("Debug - Set cookie in response")
